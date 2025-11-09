@@ -4,8 +4,8 @@
   "display": "standalone",
   "name": "tanvir7283.github",
   "orientation": "any",
-  "scope": "/index.html",
+  "scope": "/",
   "short_name": "tanvir7283.github",
-  "start_url": "/",
+  "start_url": "/index.html",
   "theme_color": "#ffffff"
 }

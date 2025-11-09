@@ -1,0 +1,11 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "tanvir7283.github",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "tanvir7283.github",
+  "start_url": "/index.html",
+  "theme_color": "#ffffff"
+}

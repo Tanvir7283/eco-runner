@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eco Runner 🌱 HUD Edition</title>
+<style>
+  body { margin:0; overflow:hidden; font-family:Arial; background:#a8e6cf; }
+  #gameCanvas { display:block; margin:auto; background:#a5d6a7; border:3px solid #2e7d32; }
+  #overlay,#pauseScreen{position:absolute;top:0;left:0;width:100%;height:100%;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;font-size:24px;color:#2e7d32;text-align:center;background:rgba(255,255,255,0.9);}
+  #pauseScreen{display:none;background:rgba(255,255,255,0.7);}
+  button{background:#2e7d32;color:white;border:none;padding:10px 20px;border-radius:10px;margin-top:15px;cursor:pointer;transition:0.3s;}
+  button:hover{background:#43a047;}
+  #pauseBtn{position:absolute;top:10px;right:10px;padding:8px 14px;background:#388e3c;border-radius:8px;color:white;cursor:pointer;}
+html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+    }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <h1>🌱 Eco Runner – HUD Edition 🌱</h1>
+  <p>Collect seeds, avoid pollution, survive, and monitor all stats!</p>
+  <button id="startBtn">Start Game</button>
+</div>
+<div id="pauseScreen">
+  <h2>⏸️ Game Paused</h2>
+  <button id="resumeBtn">Resume</button>
+</div>
+<canvas id="gameCanvas" width="900" height="500"></canvas>
+<button id="pauseBtn">⏸️</button>
+
+<script>
+
+const canvas = document.getElementById("gameCanvas"), ctx = canvas.getContext("2d");
+// Touch screen jump
+canvas.addEventListener("touchstart", () => {
+  if (!gameOver && player.grounded) {
+    player.dy = player.jump;
+    player.grounded = false;
+    jumpSound.play();
+  }
+});
+
+// Mouse click jump (for testing on PC)
+canvas.addEventListener("mousedown", () => {
+  if (!gameOver && player.grounded) {
+    player.dy = player.jump;
+    player.grounded = false;
+    jumpSound.play();
+  }
+});
+
+const overlay = document.getElementById("overlay"), pauseScreen = document.getElementById("pauseScreen");
+const startBtn = document.getElementById("startBtn"), pauseBtn = document.getElementById("pauseBtn"), resumeBtn = document.getElementById("resumeBtn");
+
+const jumpSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+const collectSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+const hitSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+
+let player, obstacles, seeds, shields, score, lives, speed, frame, gameOver, paused;
+let backgroundX = 0, multiplier = 1, lastCollectFrame = 0;
+let startTime = 0;
+
+function initGame() {
+  player = { x: 100, y: 400, w: 50, h: 80, dy: 0, gravity: 0.8, jump: -14, grounded: true, shield: 0 };
+  obstacles = []; seeds = []; shields = [];
+  score = 0; lives = 3; speed = 6; frame = 0; gameOver = false; paused = false;
+  backgroundX = 0; multiplier = 1; lastCollectFrame = 0;
+  startTime = Date.now();
+}
+
+function spawnObstacle() {
+  const types = ["pollution", "spike"];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const y = type === "spike" ? 460 : 430;
+  obstacles.push({ x: canvas.width, y: y, w: 50, h: 50, type: type, color: type==="spike"?"#d32f2f":"#424242" });
+}
+
+function spawnSeed(){ seeds.push({ x: canvas.width, y: 300 + Math.random()*80, r: 15, color: "#fdd835" }); }
+function spawnShield(){ shields.push({ x: canvas.width, y: 330, r: 20, color: "#42a5f5" }); }
+
+function drawBackground(){
+  backgroundX -= speed/4;
+  if(backgroundX <= -canvas.width) backgroundX = 0;
+  ctx.fillStyle = "#81c784";
+  ctx.fillRect(backgroundX, 0, canvas.width, canvas.height);
+  ctx.fillRect(backgroundX + canvas.width, 0, canvas.width, canvas.height);
+}
+
+function drawPlayer(){
+  ctx.fillStyle = player.shield>0?"#42a5f5":"#2e7d32";
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.fillStyle = "#1b5e20";
+  ctx.fillRect(player.x + 10, player.y + 10, 30, 30); // head
+}
+
+function drawObstacles(){ for(let obs of obstacles){ ctx.fillStyle=obs.color; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); } }
+function drawSeeds(){ for(let s of seeds){ ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 2*Math.PI); ctx.fillStyle=s.color; ctx.fill(); } }
+function drawShields(){ for(let s of shields){ ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 2*Math.PI); ctx.fillStyle=s.color; ctx.fill(); } }
+
+function handlePlayerPhysics(){
+  player.dy += player.gravity; player.y += player.dy;
+  if(player.y + player.h >= 480){ player.y = 480 - player.h; player.dy = 0; player.grounded = true; }
+  if(player.shield > 0) player.shield--;
+}
+
+function checkCollisions(){
+  for(let i=obstacles.length-1;i>=0;i--){
+    let o = obstacles[i];
+    if(player.x < o.x+o.w && player.x+player.w > o.x && player.y < o.y+o.h && player.y+player.h > o.y){
+      obstacles.splice(i,1);
+      if(player.shield>0) continue;
+      lives--; hitSound.play();
+      if(lives <= 0) gameOver=true;
+    }
+  }
+
+  for(let i=seeds.length-1;i>=0;i--){
+    let s = seeds[i];
+    if(player.x < s.x+s.r && player.x+player.w > s.x-s.r && player.y < s.y+s.r && player.y+player.h > s.y-s.r){
+      seeds.splice(i,1); collectSound.play();
+      if(frame-lastCollectFrame<60) multiplier = Math.min(multiplier+0.2,3); else multiplier=1;
+      score += 10*multiplier; lastCollectFrame = frame;
+    }
+  }
+
+  for(let i=shields.length-1;i>=0;i--){
+    let s = shields[i];
+    if(player.x < s.x+s.r && player.x+player.w > s.x-s.r && player.y < s.y+s.r && player.y+player.h > s.y-s.r){
+      shields.splice(i,1); player.shield=300; collectSound.play();
+    }
+  }
+}
+
+function getNextObstacleDistance() {
+  let minDist = canvas.width;
+  for(let obs of obstacles){
+    if(obs.x + obs.w > player.x && obs.x - player.x < minDist){
+      minDist = obs.x - player.x;
+    }
+  }
+  return Math.max(0, Math.floor(minDist));
+}
+
+function updateHUD(){
+  const elapsed = Math.floor((Date.now() - startTime)/1000);
+  const minutes = Math.floor(elapsed/60);
+  const seconds = elapsed%60;
+  const timeStr = minutes + ":" + (seconds<10?"0":"") + seconds;
+
+  ctx.fillStyle = "#1b5e20";
+  ctx.font = "20px Arial";
+  ctx.clearRect(0,0,canvas.width,50); // clear previous HUD
+  ctx.fillText(`Score: ${Math.floor(score)}   Lives: ${lives}   Multiplier: x${multiplier.toFixed(1)}   Time: ${timeStr}   Next Obstacle: ${getNextObstacleDistance()}px`, 10, 30);
+  if(player.shield>0) ctx.fillText("🛡️ Shield Active", 10, 50);
+}
+
+function update(){
+  if(paused) return;
+  if(gameOver){
+    ctx.fillStyle="rgba(255,255,255,0.8)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#2e7d32"; ctx.font="40px Arial"; ctx.fillText("Game Over!",360,220);
+    ctx.font="24px Arial"; ctx.fillText("Score: "+Math.floor(score),380,270);
+    ctx.fillText("Press Enter to Restart",340,320);
+    return;
+  }
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawBackground();
+  frame++; handlePlayerPhysics();
+  drawPlayer();
+
+  if(frame % 100 === 0) spawnObstacle();
+  if(frame % 150 === 0) spawnSeed();
+  if(frame % 600 === 0) spawnShield();
+
+  for(let arr of [obstacles,seeds,shields]){
+    for(let i=arr.length-1;i>=0;i--){ arr[i].x -= speed; if(arr[i].x + (arr[i].w||arr[i].r) <0) arr.splice(i,1);}
+  }
+
+  drawObstacles(); drawSeeds(); drawShields();
+  checkCollisions();
+  if(frame%500===0) speed += 0.3;
+  if(frame%60===0) score += 1*multiplier;
+
+  updateHUD();
+
+  requestAnimationFrame(update);
+}
+
+document.addEventListener("keydown",(e)=>{
+  if(e.code==="Space" && player.grounded && !gameOver){player.dy=player.jump;player.grounded=false;jumpSound.play();}
+  if(gameOver && e.code==="Enter"){initGame(); update();}
+});
+
+startBtn.onclick=()=>{overlay.style.display="none"; initGame(); update();}
+pauseBtn.onclick=()=>{paused=true; pauseScreen.style.display="flex";}
+resumeBtn.onclick=()=>{paused=false; pauseScreen.style.display="none"; update();}
+
+</script>
+</body>
+</html>

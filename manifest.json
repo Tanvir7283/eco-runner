@@ -4,7 +4,7 @@
   "display": "standalone",
   "name": "tanvir7283.github",
   "orientation": "any",
-  "scope": "/index,html",
+  "scope": "/index.html",
   "short_name": "tanvir7283.github",
   "start_url": "/",
   "theme_color": "#ffffff"
